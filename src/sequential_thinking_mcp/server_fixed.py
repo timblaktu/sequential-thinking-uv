@@ -17,7 +17,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
-from mcp.server.lowlevel import Server
+from mcp import ClientSession, ServerSession
+from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolResult,
@@ -27,6 +28,8 @@ from mcp.types import (
     Resource,
     TextContent,
     Tool,
+    INVALID_PARAMS,
+    INTERNAL_ERROR,
 )
 from pydantic import ValidationError
 from rich.console import Console
@@ -71,76 +74,76 @@ class SequentialThinkingServer:
         """Set up the MCP request handlers."""
         
         @self.server.list_tools()
-        async def list_tools() -> list[Tool]:
+        async def list_tools() -> ListToolsResult:
             """List available tools."""
-            return [
-                Tool(
-                    name="think",
-                    description=(
-                        "Process a sequential thinking step with support for "
-                        "revisions and branching. This tool facilitates a detailed, "
-                        "step-by-step thinking process for problem-solving and analysis. "
-                        "Only set next_thought_needed to false when truly done and "
-                        "a satisfactory answer is reached."
-                    ),
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "thought": {
-                                "type": "string",
-                                "description": "Your current thinking step"
-                            },
-                            "nextThoughtNeeded": {
-                                "type": "boolean",
-                                "description": "Whether another thought step is needed"
-                            },
-                            "thoughtNumber": {
-                                "type": "integer",
-                                "description": "Current thought number",
-                                "minimum": 1
-                            },
-                            "totalThoughts": {
-                                "type": "integer",
-                                "description": "Estimated total thoughts needed",
-                                "minimum": 1
-                            },
-                            "isRevision": {
-                                "type": "boolean",
-                                "description": "Whether this revises previous thinking"
-                            },
-                            "revisesThought": {
-                                "type": "integer",
-                                "description": "Which thought is being reconsidered",
-                                "minimum": 1
-                            },
-                            "branchFromThought": {
-                                "type": "integer",
-                                "description": "Branching point thought number",
-                                "minimum": 1
-                            },
-                            "branchId": {
-                                "type": "string",
-                                "description": "Branch identifier"
-                            },
-                            "needsMoreThoughts": {
-                                "type": "boolean",
-                                "description": "If more thoughts are needed"
-                            }
+            tool = Tool(
+                name="think",
+                description=(
+                    "Process a sequential thinking step with support for "
+                    "revisions and branching. This tool facilitates a detailed, "
+                    "step-by-step thinking process for problem-solving and analysis. "
+                    "Only set next_thought_needed to false when truly done and "
+                    "a satisfactory answer is reached."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "thought": {
+                            "type": "string",
+                            "description": "Your current thinking step"
                         },
-                        "required": [
-                            "thought",
-                            "nextThoughtNeeded", 
-                            "thoughtNumber",
-                            "totalThoughts"
-                        ]
-                    }
-                )
-            ]
+                        "nextThoughtNeeded": {
+                            "type": "boolean",
+                            "description": "Whether another thought step is needed"
+                        },
+                        "thoughtNumber": {
+                            "type": "integer",
+                            "description": "Current thought number",
+                            "minimum": 1
+                        },
+                        "totalThoughts": {
+                            "type": "integer",
+                            "description": "Estimated total thoughts needed",
+                            "minimum": 1
+                        },
+                        "isRevision": {
+                            "type": "boolean",
+                            "description": "Whether this revises previous thinking"
+                        },
+                        "revisesThought": {
+                            "type": "integer",
+                            "description": "Which thought is being reconsidered",
+                            "minimum": 1
+                        },
+                        "branchFromThought": {
+                            "type": "integer",
+                            "description": "Branching point thought number",
+                            "minimum": 1
+                        },
+                        "branchId": {
+                            "type": "string",
+                            "description": "Branch identifier"
+                        },
+                        "needsMoreThoughts": {
+                            "type": "boolean",
+                            "description": "If more thoughts are needed"
+                        }
+                    },
+                    "required": [
+                        "thought",
+                        "nextThoughtNeeded", 
+                        "thoughtNumber",
+                        "totalThoughts"
+                    ]
+                }
+            )
+            
+            return ListToolsResult(tools=[tool])
         
         @self.server.list_resources()
-        async def list_resources() -> list[Resource]:
+        async def list_resources() -> ListResourcesResult:
             """List available resources."""
-            return [
+            resources = [
                 Resource(
                     uri="thoughts://history",
                     name="Thought History",
@@ -162,6 +165,8 @@ class SequentialThinkingServer:
                     description="Complete thinking session with all thoughts and branches"
                 )
             ]
+            
+            return ListResourcesResult(resources=resources)
         
         @self.server.read_resource()
         async def read_resource(uri: str) -> ReadResourceResult:
@@ -184,7 +189,7 @@ class SequentialThinkingServer:
                     contents=[
                         TextContent(
                             type="text", 
-                            text=json.dumps(summary.model_dump(), indent=2)
+                            text=json.dumps(summary.dict(), indent=2)
                         )
                     ]
                 )
@@ -196,7 +201,7 @@ class SequentialThinkingServer:
                         branch_from_thought=thoughts[0].branch_from_thought or 0,
                         thoughts=thoughts
                     )
-                    branches_info.append(branch_info.model_dump())
+                    branches_info.append(branch_info.dict())
                 
                 return ReadResourceResult(
                     contents=[
@@ -211,7 +216,7 @@ class SequentialThinkingServer:
                     contents=[
                         TextContent(
                             type="text",
-                            text=json.dumps(self.session.model_dump(), indent=2)
+                            text=json.dumps(self.session.dict(), indent=2)
                         )
                     ]
                 )
@@ -450,9 +455,10 @@ class SequentialThinkingServer:
     async def run(self) -> None:
         """Run the server using stdio transport."""
         try:
-            async with stdio_server() as streams:
+            async with stdio_server() as (read_stream, write_stream):
                 await self.server.run(
-                    streams[0], streams[1],
+                    read_stream,
+                    write_stream,
                 )
         except KeyboardInterrupt:
             if not self.disable_thought_logging:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sequential Thinking MCP Server - Fixed Version
+Sequential Thinking MCP Server - Corrected Version
 
 A Python implementation of the Sequential Thinking MCP server that enables
 structured problem-solving by breaking down complex issues into sequential steps,
@@ -34,7 +34,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.tree import Tree
 
-from .models import ThoughtData, ThoughtSummary, BranchInfo, ThinkingSession
+from .models_fixed import ThoughtData, ThoughtSummary, BranchInfo, ThinkingSession
 
 
 class SequentialThinkingServer:
