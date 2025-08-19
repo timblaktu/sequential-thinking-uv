@@ -50,7 +50,7 @@ Documentation = "https://github.com/your-org/sequential-thinking-mcp#readme"
 Issues = "https://github.com/your-org/sequential-thinking-mcp/issues"
 
 [project.scripts]
-sequential-thinking-mcp = "sequential_thinking_mcp.server:main"
+sequential-thinking-mcp = "sequential_thinking_mcp.__main__:main"
 
 [tool.uv]
 dev-dependencies = [
