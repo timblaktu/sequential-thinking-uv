@@ -3,12 +3,12 @@
 Main entry point for the Sequential Thinking MCP Server.
 """
 
-from .server_fastmcp import mcp
+from .server import main as server_main
 
 
 def main():
     """Main entry point for the Sequential Thinking MCP Server."""
-    mcp.run()
+    server_main()
 
 
 if __name__ == "__main__":

@@ -450,9 +450,16 @@ class SequentialThinkingServer:
     async def run(self) -> None:
         """Run the server using stdio transport."""
         try:
-            async with stdio_server() as streams:
+            async with stdio_server() as (read_stream, write_stream):
+                from mcp.server.models import InitializationOptions
                 await self.server.run(
-                    streams[0], streams[1],
+                    read_stream,
+                    write_stream,
+                    InitializationOptions(
+                        server_name="sequential-thinking",
+                        server_version="0.1.0",
+                        capabilities={}
+                    )
                 )
         except KeyboardInterrupt:
             if not self.disable_thought_logging:
